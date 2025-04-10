@@ -1,21 +1,17 @@
 package pivereduware
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
 	"connectrpc.com/connect"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v5"
-	"google.golang.org/grpc"
 )
 
 const (
 	// ContextKeyUser is used to store the authenticated user's claims in context.
 	ContextKeyUser = "UserClaimsKey"
-	// XTenantKey is the metadata key for the company Id header
-	XTenantKey = "x-tenant-id"
 )
 
 // UserAuthClaims represents the JWT claims structure
@@ -64,24 +60,19 @@ func (u *UserAuthClaims) String() string {
 	return string(jb)
 }
 
-type ContextHelper interface {
-	GetTenant(connect.AnyRequest) (string, error)
-	GetUserClaims(context.Context) *UserAuthClaims
+type Middleware interface {
+	EnableHealthProbe(...string) (string, http.Handler)
+	EnableRpcReflection(mux *http.ServeMux, services ...string)
+	EnableCors(h http.Handler, allowedOrigins, allowedHeaders, allowedMethods []string) http.Handler
 }
 
-type PiverwareMiddleware interface {
-	HealthProbe(...string) (string, http.Handler)
-	CorsMiddleware(h http.Handler, allowedOrigins, allowedHeaders, allowedMethods []string) http.Handler
-	LoggingUnaryInterceptor() connect.UnaryInterceptorFunc
-	UnaryTenantPresentHeaderInterceptor(PiverwareAuthenticator) connect.UnaryFunc
-	UnaryAuthTokenValidatorInterceptor(PiverwareAuthenticator, []string) connect.UnaryInterceptorFunc
-	EnableConnectRpcReflection(mux *http.ServeMux, services ...string)
-	StreamingTokenInterceptor(authenticator PiverwareAuthenticator, routes []string) connect.StreamingHandlerFunc
+type ConnectInterceptors interface {
+	UnaryLoggingInterceptor() connect.UnaryInterceptorFunc
+	TenantPresentHeaderInterceptor(string) connect.UnaryInterceptorFunc
+	UnaryAuthTokenValidatorInterceptor([]string) connect.UnaryInterceptorFunc
 }
 
-type PiverwareAuthenticator interface {
-	ExtractHeaderToken(connect.AnyRequest) (string, error)
-	ExtractToken(ctx context.Context) (string, error)
+type Authenticator interface {
 	GetVerifier() *oidc.IDTokenVerifier
-	ValidateTokenMiddleware(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error)
+	ExtractHeaderToken(request connect.AnyRequest) (string, error)
 }

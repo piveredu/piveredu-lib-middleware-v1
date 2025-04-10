@@ -1,28 +1,33 @@
 package main
 
+import (
+	"connectrpc.com/connect"
+	"crypto/tls"
+	"github.com/piveredu/piveredu-lib-middleware-v1/pivereduware"
+	"net/http"
+)
+
 func main() {
-	//mux := http.NewServeMux()
-	//
-	//transport := &http.Transport{
-	//	TLSClientConfig: &tls.Config{
-	//		ServerName:         os.Getenv("APP.NAME"),
-	//		InsecureSkipVerify: true, // IMPORTANT!
-	//	},
-	//}
-	//authenticator, err := pivereduware.NewAuthenticator(transport)
-	//if err != nil {
-	//
-	//	os.Exit(1)
-	//}
-	//piverwareMiddleware := pivereduware.New()
-	//
-	//// Replace and use the service name from the generated proto file
-	//piverwareMiddleware.EnableConnectRpcReflection(mux, "")
-	//
-	//// Auth interceptors should be attached to the service handler
-	//interceptors := connect.WithInterceptors(
-	//	piverwareMiddleware.UnaryAuthTokenValidatorInterceptor(authenticator, []string{}),
-	//	piverwareMiddleware.LoggingUnaryInterceptor(),
-	//	piverwareMiddleware.TenantHeaderInterceptor([]string{}),
-	//)
+	mux := http.NewServeMux()
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // IMPORTANT!
+		},
+	}
+
+	silverwareAuthenticator := pivereduware.NewAuthenticator(transport)
+	silverwareMiddleware := pivereduware.NewMiddleware(silverwareAuthenticator)
+	silverwareInterceptors := pivereduware.NewInterceptors(silverwareAuthenticator)
+
+	// Replace and use the service name from the generated proto file
+	silverwareMiddleware.EnableRpcReflection(mux, "")
+	silverwareMiddleware.EnableHealthProbe()
+	//silverwareMiddleware.EnableCors()
+
+	// Interceptors should be attached to the service handler
+	_ = connect.WithInterceptors(
+		silverwareInterceptors.UnaryLoggingInterceptor(),
+		silverwareInterceptors.UnaryAuthTokenValidatorInterceptor([]string{}),
+		silverwareInterceptors.TenantPresentHeaderInterceptor("x-tenant-id"),
+	)
 }
